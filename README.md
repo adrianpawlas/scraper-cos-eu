@@ -8,6 +8,7 @@ A comprehensive scraper for COS EU that extracts product data, generates image e
 - ✅ **768-Dim Image Embeddings**: Uses `google/siglip-base-patch16-384` model for high-quality image embeddings
 - ✅ **Supabase Integration**: Direct import to your Supabase database with upsert logic
 - ✅ **Error Handling**: Robust error handling and logging
+- ✅ **Bot Protection Bypass**: Uses browser automation (Playwright) to access COS APIs
 - ✅ **Configurable**: Command-line options for testing and customization
 
 ## Database Schema
@@ -72,9 +73,22 @@ The scraper uses these default settings (configured in `cos_scraper.py`):
 
 ### 📝 Config File Setup
 
-Due to COS's bot protection, direct API access may be blocked. Instead, capture JSON responses locally:
+The scraper now uses **browser automation** to bypass COS's bot protection! Simply provide the COS API URLs:
 
 Edit `config.json`:
+```json
+{
+  "urls": [
+    "https://www.cos.com/api/search/products?location=%2F%2Fcatalog01%2Fen_GB%2Fcategories%3C%7Bcatalog01_men%2Ccatalog01_unisexaccessories%7D%2F%21statuses_eu%3E%7Bon_sale%7D&marketCode=eu&startIndex=0&viewSize=30&view=lister&clusterId=10&includeFacets=true",
+    "https://www.cos.com/api/search/products?location=%2F%2Fcatalog01%2Fen_GB%2Fcategories%3C%7Bcatalog01_women_womenwomenswear%2Ccatalog01_women%2Ccatalog01_unisexaccessories%7D%2F%21statuses_eu%3E%7Bon_sale%7D&marketCode=eu&startIndex=0&viewSize=25&view=lister&clusterId=10&includeFacets=true"
+  ],
+  "files": [],
+  "limit": null,
+  "run_on_push": true
+}
+```
+
+**Alternative**: You can still use local JSON files if needed:
 ```json
 {
   "files": [
@@ -82,19 +96,6 @@ Edit `config.json`:
     "check2.txt"
   ],
   "urls": [],
-  "limit": null,
-  "run_on_push": true
-}
-```
-
-**Alternative**: If you have working COS API URLs, you can use them directly:
-```json
-{
-  "urls": [
-    "https://www.cos.com/api/search/products?...",
-    "https://www.cos.com/api/search/products?..."
-  ],
-  "files": [],
   "limit": null,
   "run_on_push": true
 }
