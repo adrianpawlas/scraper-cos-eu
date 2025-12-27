@@ -532,24 +532,63 @@ class COSBrowserScraper:
                 await asyncio.sleep(delay)
 
     async def scrape_from_browser_url(self, url: str, limit: Optional[int] = None) -> Dict[str, int]:
-        """Scrape products from URL using browser and import to Supabase"""
+        """Scrape products from URL using browser with automatic pagination"""
         try:
-            # Fetch JSON data using browser
-            json_data = await self.fetch_json_with_browser(url)
+            all_products = []
+            start_index = 0
+            view_size = 30  # Default page size
 
-            # Process products
-            products = self.processor.process_json_response(json_data)
+            # Extract view_size from URL if present
+            import re
+            view_size_match = re.search(r'viewSize=(\d+)', url)
+            if view_size_match:
+                view_size = int(view_size_match.group(1))
 
+            logger.info(f"Starting pagination scrape with view_size={view_size}")
+
+            while True:
+                # Modify URL with current start_index
+                current_url = re.sub(r'startIndex=\d+', f'startIndex={start_index}', url)
+
+                logger.info(f"Fetching page with startIndex={start_index} (URL: {current_url})")
+
+                # Fetch JSON data using browser
+                json_data = await self.fetch_json_with_browser(current_url)
+
+                # Process products from this page
+                products = self.processor.process_json_response(json_data)
+
+                if not products:
+                    logger.info(f"No more products found at startIndex={start_index}, ending pagination")
+                    break
+
+                logger.info(f"Found {len(products)} products on this page")
+                all_products.extend(products)
+
+                # Check if we got fewer products than expected (last page)
+                if len(products) < view_size:
+                    logger.info(f"Received {len(products)} products (< {view_size}), this appears to be the last page")
+                    break
+
+                # Move to next page
+                start_index += view_size
+
+                # Add delay between pages to be respectful
+                await asyncio.sleep(random.uniform(3, 7))
+
+            # Apply global limit if specified
             if limit:
-                products = products[:limit]
-                logger.info(f"Limited to first {limit} products for testing")
+                all_products = all_products[:limit]
+                logger.info(f"Applied global limit: {limit} products total")
 
-            logger.info(f"Processed {len(products)} products successfully")
+            logger.info(f"Pagination complete! Processed {len(all_products)} products total")
 
-            # Import to Supabase
-            results = self.importer.import_products(products)
-
-            return results
+            # Import all products to Supabase
+            if all_products:
+                results = self.importer.import_products(all_products)
+                return results
+            else:
+                return {"inserted": 0, "updated": 0, "errors": 0}
 
         except Exception as e:
             logger.error(f"Failed to scrape from browser URL {url}: {e}")
