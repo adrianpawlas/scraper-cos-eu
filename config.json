@@ -1,8 +1,9 @@
 {
-  "files": [
-    "check1.txt"
+  "urls": [
+    "https://www.cos.com/api/search/products?location=%2F%2Fcatalog01%2Fen_GB%2Fcategories%3C%7Bcatalog01_men%2Ccatalog01_unisexaccessories%7D%2F%21statuses_eu%3E%7Bon_sale%7D&marketCode=eu&startIndex=0&viewSize=30&view=lister&clusterId=10&includeFacets=true",
+    "https://www.cos.com/api/search/products?location=%2F%2Fcatalog01%2Fen_GB%2Fcategories%3C%7Bcatalog01_women_womenwomenswear%2Ccatalog01_women%2Ccatalog01_unisexaccessories%7D%2F%21statuses_eu%3E%7Bon_sale%7D&marketCode=eu&startIndex=0&viewSize=25&view=lister&clusterId=10&includeFacets=true"
   ],
-  "urls": [],
+  "files": [],
   "limit": null,
   "run_on_push": true
 }

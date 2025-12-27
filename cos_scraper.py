@@ -21,6 +21,8 @@ from PIL import Image
 import requests
 from io import BytesIO
 from supabase import create_client, Client
+from playwright.async_api import async_playwright, Browser, Page
+import random
 
 # Configure logging
 logging.basicConfig(
@@ -394,6 +396,166 @@ class COSScraper:
                 logger.error(f"Failed to fetch from API: {e}")
                 return {"inserted": 0, "updated": 0, "errors": 1}
 
+
+class COSBrowserScraper:
+    """Browser-based scraper using Playwright to bypass bot detection"""
+
+    def __init__(self, supabase_url: str, supabase_key: str):
+        self.processor = COSDataProcessor()
+        self.importer = SupabaseImporter(supabase_url, supabase_key)
+        self.browser = None
+        self.context = None
+
+    async def __aenter__(self):
+        """Async context manager entry"""
+        await self.initialize_browser()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit"""
+        await self.close_browser()
+
+    async def initialize_browser(self):
+        """Initialize Playwright browser with anti-detection measures"""
+        playwright = await async_playwright().start()
+
+        # Launch browser with realistic settings
+        self.browser = await playwright.chromium.launch(
+            headless=True,
+            args=[
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--disable-gpu',
+                '--disable-web-security',
+                '--disable-features=VizDisplayCompositor',
+                '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            ]
+        )
+
+        # Create context with realistic settings
+        self.context = await self.browser.new_context(
+            viewport={'width': 1920, 'height': 1080},
+            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            locale='en-GB',
+            timezone_id='Europe/London',
+            permissions=['geolocation'],
+            geolocation={'latitude': 51.5074, 'longitude': -0.1278},  # London coordinates
+        )
+
+        # Set additional headers
+        await self.context.set_extra_http_headers({
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'en-GB,en-US;q=0.9,en;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin',
+            'Cache-Control': 'max-age=0',
+            'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Windows"',
+            'Referer': 'https://www.cos.com/en-eu/',
+        })
+
+    async def close_browser(self):
+        """Close browser and cleanup"""
+        if self.context:
+            await self.context.close()
+        if self.browser:
+            await self.browser.close()
+
+    async def fetch_json_with_browser(self, url: str, max_retries: int = 3) -> Dict[str, Any]:
+        """Fetch JSON using browser to bypass bot detection"""
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Browser attempt {attempt + 1} for: {url}")
+
+                # Create new page for each request
+                page = await self.context.new_page()
+
+                # Add random delay to simulate human behavior
+                await asyncio.sleep(random.uniform(2, 5))
+
+                # Navigate to COS homepage first to establish session
+                if attempt == 0:  # Only on first attempt
+                    logger.info("Establishing session by visiting COS homepage...")
+                    try:
+                        await page.goto('https://www.cos.com/en-eu/', wait_until='networkidle', timeout=30000)
+                        await page.wait_for_timeout(random.randint(2000, 5000))
+                    except Exception as e:
+                        logger.warning(f"Failed to visit homepage: {e}")
+
+                # Make the API request
+                logger.info(f"Fetching API data from: {url}")
+
+                # Use page.evaluate to make the request (more realistic)
+                json_data = await page.evaluate("""
+                    async (url) => {
+                        const response = await fetch(url, {
+                            method: 'GET',
+                            headers: {
+                                'Accept': 'application/json, text/plain, */*',
+                                'Accept-Language': 'en-GB,en-US;q=0.9,en;q=0.8',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        return await response.json();
+                    }
+                """, url)
+
+                await page.close()
+
+                logger.info(f"Successfully fetched data with {len(json_data.get('items', []))} items")
+                return json_data
+
+            except Exception as e:
+                logger.error(f"Browser attempt {attempt + 1} failed: {e}")
+                if 'page' in locals():
+                    await page.close()
+
+                if attempt == max_retries - 1:
+                    raise
+
+                # Exponential backoff
+                delay = 2 ** attempt
+                logger.info(f"Waiting {delay} seconds before retry...")
+                await asyncio.sleep(delay)
+
+    async def scrape_from_browser_url(self, url: str, limit: Optional[int] = None) -> Dict[str, int]:
+        """Scrape products from URL using browser and import to Supabase"""
+        try:
+            # Fetch JSON data using browser
+            json_data = await self.fetch_json_with_browser(url)
+
+            # Process products
+            products = self.processor.process_json_response(json_data)
+
+            if limit:
+                products = products[:limit]
+                logger.info(f"Limited to first {limit} products for testing")
+
+            logger.info(f"Processed {len(products)} products successfully")
+
+            # Import to Supabase
+            results = self.importer.import_products(products)
+
+            return results
+
+        except Exception as e:
+            logger.error(f"Failed to scrape from browser URL {url}: {e}")
+            return {"inserted": 0, "updated": 0, "errors": 1}
+
+
 def load_config():
     """Load configuration from config.json"""
     try:
@@ -431,8 +593,9 @@ def main():
     SUPABASE_URL = "https://yqawmzggcgpeyaaynrjk.supabase.co"
     SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxYXdtemdnY2dwZXlhYXlucmprIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTAxMDkyNiwiZXhwIjoyMDcwNTg2OTI2fQ.XtLpxausFriraFJeX27ZzsdQsFv3uQKXBBggoz6P4D4"
 
-    # Initialize scraper
+    # Initialize scrapers
     scraper = COSScraper(SUPABASE_URL, SUPABASE_KEY)
+    browser_scraper = None
 
     # Determine what to scrape
     urls_to_scrape = []
@@ -499,22 +662,25 @@ def main():
                     logger.error(f"Failed to process file {file_path}: {e}")
                     total_results["errors"] += 1
 
-            # Multiple URLs from config or single URL
-            for i, url in enumerate(urls_to_scrape, 1):
-                logger.info(f"Processing URL {i}/{len(urls_to_scrape)}: {url}")
-                try:
-                    results = await scraper.scrape_from_json_url(url, limit)
-                    total_results["inserted"] += results["inserted"]
-                    total_results["updated"] += results["updated"]
-                    total_results["errors"] += results["errors"]
+            # Multiple URLs from config or single URL (using browser to bypass bot detection)
+            if urls_to_scrape:
+                logger.info("Initializing browser scraper for URL processing...")
+                async with COSBrowserScraper(SUPABASE_URL, SUPABASE_KEY) as browser_scraper:
+                    for i, url in enumerate(urls_to_scrape, 1):
+                        logger.info(f"Processing URL {i}/{len(urls_to_scrape)}: {url}")
+                        try:
+                            results = await browser_scraper.scrape_from_browser_url(url, limit)
+                            total_results["inserted"] += results["inserted"]
+                            total_results["updated"] += results["updated"]
+                            total_results["errors"] += results["errors"]
 
-                    # Add delay between URLs to avoid overwhelming the server
-                    if i < len(urls_to_scrape):
-                        await asyncio.sleep(3)
+                            # Add delay between URLs to avoid overwhelming the server
+                            if i < len(urls_to_scrape):
+                                await asyncio.sleep(random.uniform(5, 10))
 
-                except Exception as e:
-                    logger.error(f"Failed to process URL {url}: {e}")
-                    total_results["errors"] += 1
+                        except Exception as e:
+                            logger.error(f"Failed to process URL {url}: {e}")
+                            total_results["errors"] += 1
 
         logger.info("Scraping completed!")
         logger.info(f"Total Results: {total_results}")

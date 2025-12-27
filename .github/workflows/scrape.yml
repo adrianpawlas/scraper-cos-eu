@@ -36,6 +36,10 @@ jobs:
         pip install transformers sentencepiece protobuf
         pip install -r requirements.txt
 
+    - name: Install Playwright browsers
+      run: |
+        playwright install chromium
+
     - name: Check config
       run: |
         if [ ! -f config.json ]; then
@@ -43,14 +47,16 @@ jobs:
           exit 1
         fi
 
-        # Check if URLs are configured
+        # Check if URLs or files are configured
         urls=$(python -c "import json; config=json.load(open('config.json')); urls=[u for u in config.get('urls', []) if not u.startswith('PASTE_')]; print(len(urls))")
-        if [ "$urls" -eq 0 ]; then
-          echo "No valid URLs found in config.json - skipping scrape"
+        files=$(python -c "import json; config=json.load(open('config.json')); files=[f for f in config.get('files', []) if not f.startswith('PASTE_')]; print(len(files))")
+
+        if [ "$urls" -eq 0 ] && [ "$files" -eq 0 ]; then
+          echo "No valid URLs or files found in config.json - skipping scrape"
           exit 0
         fi
 
-        echo "Found $urls URLs to process"
+        echo "Found $urls URLs and $files files to process"
 
     - name: Verify model loading
       run: |
