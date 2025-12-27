@@ -59,27 +59,14 @@ class COSEmbeddingGenerator:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         logger.info(f"Using device: {self.device}")
 
-        try:
-            # Load model and processor
-            self.processor = AutoProcessor.from_pretrained("google/siglip-base-patch16-384")
-            self.model = AutoModel.from_pretrained("google/siglip-base-patch16-384")
-            self.model.to(self.device)
-            self.model.eval()
-        except Exception as e:
-            logger.error(f"Failed to load Siglip model: {e}")
-            logger.info("Falling back to CLIP model for embeddings...")
-            # Fallback to CLIP model which is more reliable
-            from transformers import CLIPProcessor, CLIPModel
-            self.processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-            self.model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
-            self.model.to(self.device)
-            self.model.eval()
-            self.use_clip = True
-        else:
-            self.use_clip = False
+        # Load model and processor - exactly Siglip as requested
+        self.processor = AutoProcessor.from_pretrained("google/siglip-base-patch16-384")
+        self.model = AutoModel.from_pretrained("google/siglip-base-patch16-384")
+        self.model.to(self.device)
+        self.model.eval()
 
     def generate_embedding(self, image_url: str) -> Optional[List[float]]:
-        """Generate embedding from image URL"""
+        """Generate embedding from image URL using Siglip model"""
         try:
             # Download image
             response = requests.get(image_url, timeout=10)
@@ -88,28 +75,20 @@ class COSEmbeddingGenerator:
             # Open image
             image = Image.open(BytesIO(response.content)).convert("RGB")
 
-            if self.use_clip:
-                # Use CLIP model
-                inputs = self.processor(images=image, return_tensors="pt", padding=True)
-                inputs = {k: v.to(self.device) for k, v in inputs.items()}
+            # Process image with dummy text (SigLIP requires both image and text)
+            inputs = self.processor(
+                images=image,
+                text=["a photo of a fashion item"],  # Dummy text input
+                return_tensors="pt",
+                padding=True
+            )
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
-                with torch.no_grad():
-                    outputs = self.model.get_image_features(**inputs)
-                    embedding = outputs.squeeze().cpu().numpy()
-            else:
-                # Use SigLIP model
-                inputs = self.processor(
-                    images=image,
-                    text=["a photo of a fashion item"],  # Dummy text input
-                    return_tensors="pt",
-                    padding=True
-                )
-                inputs = {k: v.to(self.device) for k, v in inputs.items()}
-
-                with torch.no_grad():
-                    outputs = self.model(**inputs)
-                    # For SigLIP, use the image embeddings (vision outputs)
-                    embedding = outputs.image_embeds.squeeze().cpu().numpy()
+            # Generate embedding
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+                # For SigLIP, use the image embeddings (vision outputs)
+                embedding = outputs.image_embeds.squeeze().cpu().numpy()
 
             return embedding.tolist()
 
