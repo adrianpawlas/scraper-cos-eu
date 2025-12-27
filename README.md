@@ -72,28 +72,33 @@ The scraper uses these default settings (configured in `cos_scraper.py`):
 
 ### 📝 Config File Setup
 
+Due to COS's bot protection, direct API access may be blocked. Instead, capture JSON responses locally:
+
 Edit `config.json`:
 ```json
 {
   "files": [
-    "check1.txt"
+    "check1.txt",
+    "check2.txt"
   ],
-  "urls": [
-    "https://your-json-url-here"
-  ],
+  "urls": [],
   "limit": null,
   "run_on_push": true
 }
 ```
 
-**Current setup uses:**
-- `check1.txt` - Contains 25 men's products with full data
-- Add more `.txt` files as you capture them
-
-**To add more data:**
-1. Capture new JSON responses from COS
-2. Save them as local files (e.g., `data1.txt`, `data2.txt`)
-3. Add them to the `files` array in `config.json`
+**Alternative**: If you have working COS API URLs, you can use them directly:
+```json
+{
+  "urls": [
+    "https://www.cos.com/api/search/products?...",
+    "https://www.cos.com/api/search/products?..."
+  ],
+  "files": [],
+  "limit": null,
+  "run_on_push": true
+}
+```
 
 ### Manual Usage Options
 
