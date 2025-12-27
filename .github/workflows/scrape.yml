@@ -52,6 +52,17 @@ jobs:
 
         echo "Found $urls URLs to process"
 
+    - name: Verify model loading
+      run: |
+        python -c "
+        import torch
+        from transformers import AutoProcessor, AutoModel
+        print('Testing Siglip model loading...')
+        processor = AutoProcessor.from_pretrained('google/siglip-base-patch16-384')
+        model = AutoModel.from_pretrained('google/siglip-base-patch16-384')
+        print('✅ Siglip model loaded successfully!')
+        "
+
     - name: Run scraper
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
