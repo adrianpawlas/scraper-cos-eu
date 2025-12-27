@@ -173,19 +173,30 @@ python cos_scraper.py --json-url "https://your-captured-url-here"
 python cos_scraper.py --json-url "https://your-url-here" --limit 5
 ```
 
-## 🔧 GitHub Setup
+## 🔧 GitHub Setup (Repository: https://github.com/adrianpawlas/scraper-cos-eu)
 
-### 1. Add Secrets to Repository
+### ✅ **Already Done:**
+- ✅ Code pushed to GitHub
+- ✅ GitHub Actions workflow configured
+- ✅ Scheduled to run at **midnight UTC daily**
+- ✅ **12-hour timeout** to prevent long runs
+- ✅ **Manual trigger** capability
 
-Go to your GitHub repo → Settings → Secrets and variables → Actions:
+### 🎯 **Final Setup Steps:**
+
+#### 1. Add Secrets to Repository
+
+Go to: **https://github.com/adrianpawlas/scraper-cos-eu/settings/secrets/actions**
 
 Add these secrets:
 - `SUPABASE_URL`: `https://yqawmzggcgpeyaaynrjk.supabase.co`
 - `SUPABASE_KEY`: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxYXdtemdnY2dwZXlhYXlucmprIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTAxMDkyNiwiZXhwIjoyMDcwNTg2OTI2fQ.XtLpxausFriraFJeX27ZzsdQsFv3uQKXBBggoz6P4D4`
 
-### 2. Edit config.json
+#### 2. Edit config.json
 
-Replace the placeholder URLs with your actual COS JSON URLs:
+**Open:** https://github.com/adrianpawlas/scraper-cos-eu/blob/master/config.json
+
+**Edit and replace** with your actual COS JSON URLs:
 
 ```json
 {
@@ -198,9 +209,15 @@ Replace the placeholder URLs with your actual COS JSON URLs:
 }
 ```
 
-### 3. Push to GitHub
+#### 3. Push the Changes
 
-The scraper will run automatically when you push changes to `config.json`!
+The scraper will run automatically!
+
+### 📅 **Automation Schedule:**
+- **Daily at midnight UTC** (00:00 UTC)
+- **12-hour maximum runtime**
+- **Manual runs** via GitHub Actions tab
+- **Triggers on config.json changes**
 
 ## 📁 Files Included
 
