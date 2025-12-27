@@ -9,6 +9,7 @@ A comprehensive scraper for COS EU that extracts product data, generates image e
 - ✅ **Supabase Integration**: Direct import to your Supabase database with upsert logic
 - ✅ **Error Handling**: Robust error handling and logging
 - ✅ **Bot Protection Bypass**: Uses browser automation (Playwright) to access COS APIs
+- ✅ **Automatic Pagination**: Scrapes ALL products through automatic page navigation
 - ✅ **Configurable**: Command-line options for testing and customization
 
 ## Database Schema
