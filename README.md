@@ -75,14 +75,25 @@ The scraper uses these default settings (configured in `cos_scraper.py`):
 Edit `config.json`:
 ```json
 {
+  "files": [
+    "check1.txt"
+  ],
   "urls": [
-    "https://your-mens-json-url-here",
-    "https://your-womens-json-url-here"
+    "https://your-json-url-here"
   ],
   "limit": null,
   "run_on_push": true
 }
 ```
+
+**Current setup uses:**
+- `check1.txt` - Contains 25 men's products with full data
+- Add more `.txt` files as you capture them
+
+**To add more data:**
+1. Capture new JSON responses from COS
+2. Save them as local files (e.g., `data1.txt`, `data2.txt`)
+3. Add them to the `files` array in `config.json`
 
 ### Manual Usage Options
 
