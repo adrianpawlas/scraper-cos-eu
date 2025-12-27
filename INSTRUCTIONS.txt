@@ -1,0 +1,37 @@
+🚀 COS SCRAPER - GITHUB AUTOMATION
+
+🎯 **Easiest Setup**: Edit `config.json` and push to GitHub!
+
+1. **Get your JSON URLs**:
+   - Go to: https://www.cos.com/en-eu/men/view-all (or women/view-all)
+   - Press F12 → Network tab
+   - Scroll down to load products
+   - Find JSON request with "items" array
+   - Right-click → Copy link address
+
+2. **Edit config.json**:
+   ```json
+   {
+     "urls": [
+       "PASTE_YOUR_MENS_URL_HERE",
+       "PASTE_YOUR_WOMENS_URL_HERE"
+     ]
+   }
+   ```
+
+3. **Add GitHub Secrets** (repo Settings → Secrets):
+   - `SUPABASE_URL`: https://yqawmzggcgpeyaaynrjk.supabase.co
+   - `SUPABASE_KEY`: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+4. **Push to GitHub** - scraper runs automatically!
+
+✅ **What happens**:
+- Runs when you push config.json changes
+- Daily automatic updates at 2 AM UTC
+- Manual runs via GitHub Actions tab
+- Processes all URLs in config.json
+- Generates embeddings + imports to Supabase
+
+📁 **Files to edit**:
+- `config.json` - paste your URLs here
+- Push to GitHub and watch it run automatically!

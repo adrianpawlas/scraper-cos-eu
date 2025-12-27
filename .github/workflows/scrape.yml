@@ -1,0 +1,60 @@
+name: COS Product Scraper
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'config.json'
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Allow manual runs
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Check config
+      run: |
+        if [ ! -f config.json ]; then
+          echo "config.json not found"
+          exit 1
+        fi
+
+        # Check if URLs are configured
+        urls=$(python -c "import json; config=json.load(open('config.json')); urls=[u for u in config.get('urls', []) if not u.startswith('PASTE_')]; print(len(urls))")
+        if [ "$urls" -eq 0 ]; then
+          echo "No valid URLs found in config.json - skipping scrape"
+          exit 0
+        fi
+
+        echo "Found $urls URLs to process"
+
+    - name: Run scraper
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      run: |
+        python cos_scraper.py --config
+
+    - name: Commit and push results (optional)
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add -A
+        git diff --cached --quiet || git commit -m "Update scraped data [skip ci]"
+        git push || true
