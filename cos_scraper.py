@@ -410,6 +410,7 @@ def main():
 
     # Determine what to scrape
     urls_to_scrape = []
+    files_to_scrape = []
     limit = args.limit
 
     if args.config or (not args.json_file and not args.json_url):
@@ -419,22 +420,23 @@ def main():
             return
 
         urls_to_scrape = config.get("urls", [])
+        files_to_scrape = config.get("files", [])
         if limit is None:
             limit = config.get("limit")
 
-        # Filter out placeholder URLs
+        # Filter out placeholder URLs and files
         urls_to_scrape = [url for url in urls_to_scrape if not url.startswith("PASTE_")]
+        files_to_scrape = [file for file in files_to_scrape if not file.startswith("PASTE_")]
 
-        if not urls_to_scrape:
-            print("No valid URLs found in config.json")
-            print("Please edit config.json and add your JSON URLs")
+        if not urls_to_scrape and not files_to_scrape:
+            print("No valid URLs or files found in config.json")
+            print("Please edit config.json and add your JSON URLs or files")
             return
 
     elif args.json_url:
         urls_to_scrape = [args.json_url]
     elif args.json_file:
-        # Handle single file
-        pass  # Will be handled below
+        files_to_scrape = [args.json_file]
     else:
         print("ERROR: You must provide either --json-file, --json-url, or use --config")
         print("\nUsage examples:")
@@ -451,24 +453,29 @@ def main():
     async def run_scraper():
         total_results = {"inserted": 0, "updated": 0, "errors": 0}
 
-        if args.json_file:
-            # Single file
-            results = scraper.scrape_from_json_file(args.json_file, limit)
-            total_results["inserted"] += results["inserted"]
-            total_results["updated"] += results["updated"]
-            total_results["errors"] += results["errors"]
-        else:
-            # Multiple URLs from config or single URL
-            for i, url in enumerate(urls_to_scrape, 1):
-                logger.info(f"Processing URL {i}/{len(urls_to_scrape)}: {url}")
-                try:
-                    results = await scraper.scrape_from_json_url(url, limit)
-                    total_results["inserted"] += results["inserted"]
-                    total_results["updated"] += results["updated"]
-                    total_results["errors"] += results["errors"]
-                except Exception as e:
-                    logger.error(f"Failed to process URL {url}: {e}")
-                    total_results["errors"] += 1
+        # Process files
+        for file_path in files_to_scrape:
+            logger.info(f"Processing file: {file_path}")
+            try:
+                results = scraper.scrape_from_json_file(file_path, limit)
+                total_results["inserted"] += results["inserted"]
+                total_results["updated"] += results["updated"]
+                total_results["errors"] += results["errors"]
+            except Exception as e:
+                logger.error(f"Failed to process file {file_path}: {e}")
+                total_results["errors"] += 1
+
+        # Process URLs
+        for i, url in enumerate(urls_to_scrape, 1):
+            logger.info(f"Processing URL {i}/{len(urls_to_scrape)}: {url}")
+            try:
+                results = await scraper.scrape_from_json_url(url, limit)
+                total_results["inserted"] += results["inserted"]
+                total_results["updated"] += results["updated"]
+                total_results["errors"] += results["errors"]
+            except Exception as e:
+                logger.error(f"Failed to process URL {url}: {e}")
+                total_results["errors"] += 1
 
         logger.info("Scraping completed!")
         logger.info(f"Total Results: {total_results}")
