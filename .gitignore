@@ -48,5 +48,10 @@ Thumbs.db
 !config.json
 !requirements.txt
 
+# Test data files
+check1.txt
+check2.txt
+*.txt
+
 # GitHub Actions
 .github/workflows/*.log
