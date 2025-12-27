@@ -436,6 +436,7 @@ def main():
 
     # Determine what to scrape
     urls_to_scrape = []
+    files_to_scrape = []
     limit = args.limit
 
     if args.config or (not args.json_file and not args.json_url):
@@ -445,15 +446,17 @@ def main():
             return
 
         urls_to_scrape = config.get("urls", [])
+        files_to_scrape = config.get("files", [])
         if limit is None:
             limit = config.get("limit")
 
-        # Filter out placeholder URLs
+        # Filter out placeholder URLs and files
         urls_to_scrape = [url for url in urls_to_scrape if not url.startswith("PASTE_")]
+        files_to_scrape = [file for file in files_to_scrape if not file.startswith("PASTE_")]
 
-        if not urls_to_scrape:
-            print("No valid URLs found in config.json")
-            print("Please edit config.json and add your JSON URLs")
+        if not urls_to_scrape and not files_to_scrape:
+            print("No valid URLs or files found in config.json")
+            print("Please edit config.json and add your JSON URLs or files")
             return
 
     elif args.json_url:
