@@ -321,28 +321,54 @@ class COSScraper:
 
         return results
 
-    async def fetch_json_from_url(self, url: str) -> Dict[str, Any]:
-        """Fetch JSON data from URL with proper headers to mimic browser requests"""
+    async def fetch_json_from_url(self, url: str, max_retries: int = 3) -> Dict[str, Any]:
+        """Fetch JSON data from URL with comprehensive headers and retry logic"""
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'application/json, text/plain, */*',
-            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Language': 'en-GB,en-US;q=0.9,en;q=0.8',
             'Accept-Encoding': 'gzip, deflate, br',
             'DNT': '1',
             'Connection': 'keep-alive',
             'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin',
+            'Cache-Control': 'max-age=0',
+            'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Windows"',
+            'Referer': 'https://www.cos.com/en-eu/',
+            'Origin': 'https://www.cos.com',
+            'X-Requested-With': 'XMLHttpRequest',
         }
 
-        async with aiohttp.ClientSession(headers=headers) as session:
+        for attempt in range(max_retries):
             try:
-                async with session.get(url) as response:
-                    response.raise_for_status()
-                    json_data = await response.json()
-                    return json_data
+                # Add delay between requests (exponential backoff)
+                if attempt > 0:
+                    delay = 2 ** attempt  # 2, 4, 8 seconds
+                    logger.info(f"Retry attempt {attempt + 1}, waiting {delay} seconds...")
+                    await asyncio.sleep(delay)
+
+                # Add some delay to avoid rate limiting
+                await asyncio.sleep(1)
+
+                async with aiohttp.ClientSession(headers=headers) as session:
+                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
+                        logger.info(f"Response status: {response.status}")
+                        logger.info(f"Response headers: {dict(response.headers)}")
+
+                        response.raise_for_status()
+                        json_data = await response.json()
+                        return json_data
 
             except Exception as e:
-                logger.error(f"Failed to fetch JSON from {url}: {e}")
-                raise
+                logger.error(f"Attempt {attempt + 1} failed for {url}: {e}")
+                if attempt == max_retries - 1:
+                    logger.error(f"All {max_retries} attempts failed for {url}")
+                    raise
+                continue
 
     async def scrape_from_api(self, api_url: str) -> Dict[str, int]:
         """Scrape products from API endpoint"""
@@ -410,7 +436,6 @@ def main():
 
     # Determine what to scrape
     urls_to_scrape = []
-    files_to_scrape = []
     limit = args.limit
 
     if args.config or (not args.json_file and not args.json_url):
@@ -420,23 +445,22 @@ def main():
             return
 
         urls_to_scrape = config.get("urls", [])
-        files_to_scrape = config.get("files", [])
         if limit is None:
             limit = config.get("limit")
 
-        # Filter out placeholder URLs and files
+        # Filter out placeholder URLs
         urls_to_scrape = [url for url in urls_to_scrape if not url.startswith("PASTE_")]
-        files_to_scrape = [file for file in files_to_scrape if not file.startswith("PASTE_")]
 
-        if not urls_to_scrape and not files_to_scrape:
-            print("No valid URLs or files found in config.json")
-            print("Please edit config.json and add your JSON URLs or files")
+        if not urls_to_scrape:
+            print("No valid URLs found in config.json")
+            print("Please edit config.json and add your JSON URLs")
             return
 
     elif args.json_url:
         urls_to_scrape = [args.json_url]
     elif args.json_file:
-        files_to_scrape = [args.json_file]
+        # Handle single file
+        pass  # Will be handled below
     else:
         print("ERROR: You must provide either --json-file, --json-url, or use --config")
         print("\nUsage examples:")
@@ -453,29 +477,29 @@ def main():
     async def run_scraper():
         total_results = {"inserted": 0, "updated": 0, "errors": 0}
 
-        # Process files
-        for file_path in files_to_scrape:
-            logger.info(f"Processing file: {file_path}")
-            try:
-                results = scraper.scrape_from_json_file(file_path, limit)
-                total_results["inserted"] += results["inserted"]
-                total_results["updated"] += results["updated"]
-                total_results["errors"] += results["errors"]
-            except Exception as e:
-                logger.error(f"Failed to process file {file_path}: {e}")
-                total_results["errors"] += 1
+        if args.json_file:
+            # Single file
+            results = scraper.scrape_from_json_file(args.json_file, limit)
+            total_results["inserted"] += results["inserted"]
+            total_results["updated"] += results["updated"]
+            total_results["errors"] += results["errors"]
+        else:
+            # Multiple URLs from config or single URL
+            for i, url in enumerate(urls_to_scrape, 1):
+                logger.info(f"Processing URL {i}/{len(urls_to_scrape)}: {url}")
+                try:
+                    results = await scraper.scrape_from_json_url(url, limit)
+                    total_results["inserted"] += results["inserted"]
+                    total_results["updated"] += results["updated"]
+                    total_results["errors"] += results["errors"]
 
-        # Process URLs
-        for i, url in enumerate(urls_to_scrape, 1):
-            logger.info(f"Processing URL {i}/{len(urls_to_scrape)}: {url}")
-            try:
-                results = await scraper.scrape_from_json_url(url, limit)
-                total_results["inserted"] += results["inserted"]
-                total_results["updated"] += results["updated"]
-                total_results["errors"] += results["errors"]
-            except Exception as e:
-                logger.error(f"Failed to process URL {url}: {e}")
-                total_results["errors"] += 1
+                    # Add delay between URLs to avoid overwhelming the server
+                    if i < len(urls_to_scrape):
+                        await asyncio.sleep(3)
+
+                except Exception as e:
+                    logger.error(f"Failed to process URL {url}: {e}")
+                    total_results["errors"] += 1
 
         logger.info("Scraping completed!")
         logger.info(f"Total Results: {total_results}")
