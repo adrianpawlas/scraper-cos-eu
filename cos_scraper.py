@@ -487,6 +487,18 @@ def main():
             total_results["updated"] += results["updated"]
             total_results["errors"] += results["errors"]
         else:
+            # Process files
+            for file_path in files_to_scrape:
+                logger.info(f"Processing file: {file_path}")
+                try:
+                    results = scraper.scrape_from_json_file(file_path, limit)
+                    total_results["inserted"] += results["inserted"]
+                    total_results["updated"] += results["updated"]
+                    total_results["errors"] += results["errors"]
+                except Exception as e:
+                    logger.error(f"Failed to process file {file_path}: {e}")
+                    total_results["errors"] += 1
+
             # Multiple URLs from config or single URL
             for i, url in enumerate(urls_to_scrape, 1):
                 logger.info(f"Processing URL {i}/{len(urls_to_scrape)}: {url}")
