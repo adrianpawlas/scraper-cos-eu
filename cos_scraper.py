@@ -60,7 +60,7 @@ class COSEmbeddingGenerator:
         logger.info(f"Using device: {self.device}")
 
         # Load model and processor
-        self.processor = AutoProcessor.from_pretrained("google/siglip-base-patch16-384", use_fast=True)
+        self.processor = AutoProcessor.from_pretrained("google/siglip-base-patch16-384")
         self.model = AutoModel.from_pretrained("google/siglip-base-patch16-384")
         self.model.to(self.device)
         self.model.eval()
